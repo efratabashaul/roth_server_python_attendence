@@ -1,37 +1,25 @@
-import openai
+from flask import Blueprint,request, jsonify
+from services.audio_service import main
+audio_bp = Blueprint('audio_bp', __name__)
 import os
-from flask import Blueprint
 
-# הגדרת קונטרולר בשם 'user'
-audio_bp = Blueprint('user_bp', __name__)
-# הגדר את מפתח ה-API שלך מ-OpenAI
+@audio_bp.route('/audio', methods=['POST'])
+def transcribe_audio():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
 
+    file = request.files['file']
 
-def transcribe_audio(file_path):
-    try:
-        # פותחים את קובץ האודיו
-        with open(file_path, 'rb') as audio_file:
-            # משתמשים ב-OpenAI API לתמלול השיחה
-            transcript = openai.Audio.transcribe(
-                model="whisper-1",
-                file=audio_file,
-                response_format="text",
-                language="he"  # קידוד לשפה עברית
-            )
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
 
-        return transcript['text']
+    # שמירת הקובץ לנתיב המתאים בתיקיית audios
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    audio_dir = os.path.join(project_root, "audios")
+    os.makedirs(audio_dir, exist_ok=True)
+    file_path = os.path.join(audio_dir, file.filename)
+    file.save(file_path)
 
-    except Exception as e:
-        print(f"Error during transcription: {e}")
-        return None
-
-
-# דוגמת קריאה לפונקציה
-file_path = "conversation_hebrew.wav"  # נתיב לקובץ האודיו שלך
-transcript_text = transcribe_audio(file_path)
-
-if transcript_text:
-    print("תמלול השיחה בעברית:")
-    print(transcript_text)
-else:
-    print("הייתה בעיה בתמלול.")
+    # הרצת הפונקציה על הקובץ שנשמר
+    result = main(file_path)
+    return jsonify({"message": "Task summarized successfully", "summary": result}), 200

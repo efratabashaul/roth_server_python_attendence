@@ -7,17 +7,11 @@ import soundfile as sf
 import requests
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
-from pydub.utils import which
 load_dotenv()
-#from openai import OpenAI
-#client = OpenAI()
 
 openai.api_key = os.getenv('GPT_API_KEY')
 
 
-
-#AudioSegment.converter = which("ffmpeg")  # מציין את הנתיב ל-ffmpeg אם צריך באופן ידני
-#AudioSegment.ffprobe = which("ffprobe")
 
 def remove_background_noise(file_path):
     """
@@ -120,8 +114,10 @@ def split_and_transcribe(file_path, min_silence_len=1000, silence_thresh=-40, se
         keep_silence=500
     )
 
-    output_dir = os.path.join(os.getcwd(), f"{file_name}_segments")
-    os.makedirs(output_dir, exist_ok=True)
+    # עלייה בתיקייה אחת למעלה כדי להגיע ל-python_server
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # תיקיית הפרויקט הראשית 'python_server'
+    output_dir = os.path.join(project_root, "segments")  # תיקיית 'audios' בתוך python_server
+    os.makedirs(output_dir, exist_ok=True)  # יצירת תיקייה אם לא קיימת
 
     current_segment = AudioSegment.empty()
     segment_count = 0
@@ -181,11 +177,11 @@ def split_and_transcribe(file_path, min_silence_len=1000, silence_thresh=-40, se
 system_prompt = """
 אתה הולך לקבל תמלול ראשוני של שיחה בין נציג שירות לקוחות ללקוח בחברת עורכי דין נתנאל רוט.
 - נציגת שירות הלקוחות תמיד מציגה את עצמה בשם רוני ואומרת שהיא ממשרד עו"ד נתנאל רוט.
-- השיחות מתחילות לעיתים קרובות עם המשפט 'ראיתי שהתחלת למלא את השאלון באזור האישי, והפסקת, אז מה עם המסמכים?'
+- השיחות מתחילות לעיתים קרובות במשפט כמו- 'ראיתי שפנית אלינו, אז איפה זה עומד?', וכדומה.
 - נציגת שירות הלקוחות שואלת שאלות לגבי פרטים אישיים ומסמכים משפטיים של הלקוח.
-- הלקוח בדרך כלל עונה על השאלות, או שואל שאלות נוספות בנוגע למצבו המשפטי או הרפואי.
+- הלקוח בדרך כלל עונה על השאלות,  ושואל שאלות נוספות בנוגע למצבו המשפטי או הרפואי.
 - עורך הדין עשוי להיכנס לשיחה כאשר יש שאלות מקצועיות יותר, ולספק תשובות משפטיות.
-עליך לתקן את התמלול, לוודא שכל דובר ברור, ולשפר את השיחה כך שתהיה זורמת, מובנת וברורה תוך שמירה על כל המידע מהלקוח, בלי להוריד כל מידע חשוב!, ושמירה על המשמעות המשפטית והרפואית.
+עליך לתקן את התמלול, לוודא שכל דובר ברור, ולשפר את השיחה כך שתהיה זורמת, מובנת וברורה תוך שמירה על כל המידע מהלקוח, בלי להוריד ולהוסיף כל מידע חשוב, אלא רק לתקן את מה שיש!-שמירה על המשמעות המשפטית והרפואית, תהיה מדויק כמה שאתה יכול!.
 """
 def generate_corrected_transcript(temperature, system_prompt, audio_file):
     response = openai.ChatCompletion.create(
@@ -206,24 +202,26 @@ def generate_corrected_transcript(temperature, system_prompt, audio_file):
 
 
 
+def main(file_path):
+    corrected_text = generate_corrected_transcript(0, system_prompt, file_path)
+    if corrected_text:
+        print("תמלול השיחה בעברית:")
+        print(corrected_text)
+    else:
+        print("הייתה בעיה בתמלול.")
+    return corrected_text
 
 # דוגמת קריאה לפונקציה
 #file_path = '../audios/someone-just-made-me-very-angry-child-spoken-204916.mp3' # נתיב לקובץ האודיו שלך
 #file_path = '../audios/‏‏WhatsApp Ptt 2024-10-07 at 11.41.48 - עותק.mp3' # נתיב לקובץ האודיו שלך
 #file_path='../audios/202410071259060283eqvcg0klhg3372-vc1531-p0EOP1MD-972547421225.mp3'#יחסית טוב אסם
 #file_path = '../audios/2024100712285802830w0uxl0cfspn6k-vc1531-p0EOP1MD-972542279791.mp3'#יחסית טוב תבדוק עם העורך דין-ביקור אתמול
-file_path='../audios/202410071234220283je478f0a5jmzgu-vc1531-p0EOP1MD-972509031043.mp3'#-5 סגמנטים
+#file_path='../audios/202410071234220283je478f0a5jmzgu-vc1531-p0EOP1MD-972509031043.mp3'#-5 סגמנטים
 #file_path='../audios/2024100807193102833nhp1i0x9fj5cn-vc1531-p0EOP1MD-972542044385.mp3'#-מלחמה
 #file_path='../audios/202410080643070283053esj0e5jffrf-vc1531-p0EOP1MD-972523103311.mp3'
 #file_path='../audios/202410080643070283053esj0e5jffrf-vc1531-p0EOP1MD-972523103311.wav'
 #file_path='../audios/2024100807300802836mny90ik9d2ptz-vc1531-p0EOP1MD-972585519001.mp3'#כתף-יחסית טוב
 #file_path='../audios/20241007124551028321pi0hyjxu76ym-vc1531-p0EOP1MD-972586869132.mp3'#7 יחסית טוב עו"ד
 #cleaned_audio = remove_background_noise(file_path)
-corrected_text = generate_corrected_transcript(0, system_prompt, file_path)
+#main(file_path)
 
-
-if corrected_text:
-    print("תמלול השיחה בעברית:")
-    print(corrected_text)
-else:
-    print("הייתה בעיה בתמלול.")
